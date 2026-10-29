@@ -1,0 +1,26 @@
+.travel-dates-panel{margin:28px 0 30px;padding:23px 25px;background:var(--paper-deep);border-left:2px solid var(--accent)}
+.travel-dates-panel .eyebrow{font-size:8px;letter-spacing:2.2px;color:var(--accent);margin-bottom:11px}
+.travel-dates-panel h3{font-family:var(--serif);font-size:21px;letter-spacing:1px;font-weight:500;margin:0 0 17px}
+.travel-dates-panel ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}
+.travel-dates-panel li{display:flex;align-items:baseline;gap:13px;font-size:12px;line-height:1.9}
+.travel-dates-panel li>span{font-family:Georgia,serif;font-size:10px;color:var(--accent)}
+.travel-dates-panel time{color:var(--ink);font-variant-numeric:tabular-nums}
+.travel-calendar{margin-top:21px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.travel-calendar>summary{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:17px 0;min-height:48px;font-size:11px;letter-spacing:.7px;cursor:pointer;list-style:none;color:var(--accent)}
+.travel-calendar>summary::-webkit-details-marker{display:none}
+.travel-calendar>summary .icon{width:15px;height:15px;transition:transform .2s}
+.travel-calendar[open]>summary .icon{transform:rotate(180deg)}
+.travel-calendar>div{padding:2px 0 19px}
+.travel-calendar-year+ .travel-calendar-year{margin-top:24px}
+.travel-calendar-year h3{display:flex;gap:14px;align-items:baseline;font-family:Georgia,serif;font-size:22px;font-weight:400;margin:0 0 10px}
+.travel-calendar-year h3 small{font-family:var(--body);font-size:10px;letter-spacing:.5px;color:var(--muted)}
+.travel-calendar-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:transparent;padding:12px 1px;min-height:44px;color:var(--ink)}
+.travel-calendar-row:hover{color:var(--accent)}
+.travel-calendar-row>span{font-size:12px;line-height:1.7}
+.travel-calendar-row>span small{display:block;font-size:9px;color:var(--muted)}
+.travel-calendar-row time{font-size:10px;line-height:1.8;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.timeline-photo-placeholder{display:flex;width:65px;height:65px;align-items:center;justify-content:center;background:var(--paper);color:var(--accent);font-family:var(--serif);font-size:22px;border:1px solid var(--line)}
+.pending-place small{white-space:normal;line-height:1.8;max-width:260px}
+.visit-only-body{padding-top:50px;padding-bottom:50px;min-height:320px}
+@media(min-width:761px) and (max-width:1050px){.timeline-photo-placeholder{width:45px;height:55px;font-size:18px}.travel-calendar-row{gap:8px}.travel-calendar-row time{font-size:9px}}
+@media(max-width:760px){.travel-dates-panel{padding:21px 18px;margin:23px 0}.travel-dates-panel h3{font-size:20px}.travel-dates-panel ol{grid-template-columns:minmax(0,1fr);gap:10px}.travel-dates-panel li{font-size:12px}.travel-calendar>summary{font-size:12px;padding:18px 0}.travel-calendar-row{padding:13px 1px}.travel-calendar-row>span{font-size:12px}.travel-calendar-row time{font-size:10px}.timeline-photo-placeholder{width:59px;height:59px;font-size:21px}.visit-only-body{padding-top:35px}.pending-place{flex-wrap:wrap}.pending-place small{font-size:10px;max-width:230px}}

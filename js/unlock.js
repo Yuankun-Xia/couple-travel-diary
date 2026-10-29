@@ -1,4 +1,4 @@
-import { startJournal } from './journal.js';
+import { startJournal } from './journal.js?v=20261029-dates1';
 import { decryptEnvelope } from './crypto.js';
 
 const status = document.querySelector('#gateStatus');

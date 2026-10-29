@@ -1,3 +1,5 @@
+import {tripVisits,tripYears,hasTripDate,latestTripDate,visitDateLabel,tripDateLabel,tripTravelDays,timelineRecords} from './dates.js?v=20261029-1';
+/* OWNER_TRAVEL_DATES */
 
 export async function startJournal({assets,seed,chinaMapData}) {
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
@@ -11,26 +13,47 @@ const icon=id=>`<svg class="icon" aria-hidden="true"><use href="#i-${id}"/></svg
 const photoSrc=p=>p.src||(p.asset&&assets[p.asset])||assets.coast;
 const photoThumb=p=>(p.thumbAsset&&assets[p.thumbAsset])||photoSrc(p);
 const tripYear=t=>(t.start||'').slice(0,4);
-const dateLabel=t=>!t.start?'日期待补充':dateString(t.start)+(t.end&&t.end!==t.start?' — '+dateString(t.end):'');
+const dateLabel=tripDateLabel;
 const dateString=value=>{if(!value)return '';const [y,m,d]=value.split('-');return `${y}.${m}.${d}`;};
 const dayCount=t=>{const start=Date.parse(t.start+'T00:00:00Z'),end=Date.parse((t.end||t.start)+'T00:00:00Z');return Number.isFinite(start)&&Number.isFinite(end)?Math.max(1,Math.round((end-start)/86400000)+1):1;};
-const sorted=()=>[...state.trips].sort((a,b)=>(b.start||'').localeCompare(a.start||'')||a.place.localeCompare(b.place,'zh-CN'));
+const sorted=()=>[...state.trips].sort((a,b)=>latestTripDate(b).localeCompare(latestTripDate(a))||a.place.localeCompare(b.place,'zh-CN'));
 let toastTimer;function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),4200);}
 function openDialog(id){const dialog=document.getElementById(id);if(!dialog.open)dialog.showModal();}
 function closeDialog(id){document.getElementById(id).close();}
+
+function renderVisitPanel(trip,force=false){
+ const visits=tripVisits(trip);if(!visits.length||(!force&&visits.length<2))return '';
+ return '<section class="travel-dates-panel"><div class="eyebrow">DATES WE KEEP</div><h3>我们来过的日子</h3><ol>'+visits.map((v,i)=>'<li><span>'+String(i+1).padStart(2,'0')+'</span><time datetime="'+escape(v.start)+'">'+escape(visitDateLabel(v))+'</time></li>').join('')+'</ol></section>';
+}
+function renderTravelTimeline(){
+ const records=timelineRecords(sorted(),state.settings.travelDates);
+ const action=r=>r.trip?'data-trip="'+escape(r.trip.id)+'"':'data-visit-city="'+escape(r.city)+'"';
+ const recent=records.slice(0,4).map(r=>'<button class="timeline-row" '+action(r)+'><span class="timeline-date">'+(r.precision==='year-range'?'时光':escape(r.start.slice(5).replace('-','.')))+'<small>'+escape(r.start.slice(0,4))+'</small></span><span class="timeline-dot"></span>'+(r.trip?'<img src="'+photoThumb(r.trip.photos[r.trip.cover||0]||r.trip.photos[0])+'" alt="" loading="lazy">':'<span class="timeline-photo-placeholder" aria-hidden="true">记</span>')+'<span class="timeline-caption"><strong>'+escape(r.city)+' · '+(r.trip?'我们的片段':'日期已收藏')+'</strong><span>'+escape(visitDateLabel(r))+'<br>'+(r.trip?r.trip.photos.length+' 帧回忆':'照片待补')+'</span></span>'+icon('diag')+'</button>').join('');
+ const group=r=>r.precision==='year-range'?r.start+'—'+r.end:r.start.slice(0,4),years=[...new Set(records.map(group))];
+ const precise=records.filter(r=>r.precision!=='year-range').length,periods=records.length-precise;
+ const all=records.length?'<details class="travel-calendar"><summary>完整行程 · '+precise+' 次出发'+(periods?' · '+periods+' 段时光':'')+'<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div>'+years.map(year=>'<section class="travel-calendar-year"><h3>'+escape(year)+' <small>'+(year.includes('—')?'回忆时段':records.filter(r=>group(r)===year).length+' 次旅行')+'</small></h3>'+records.filter(r=>group(r)===year).map(r=>'<button class="travel-calendar-row" '+action(r)+'><span>'+escape(r.city)+(r.trip?'':'<small>照片待补</small>')+'</span><time datetime="'+escape(r.start)+'">'+escape(visitDateLabel(r))+'</time></button>').join('')+'</section>').join('')+'</div></details>':'';
+ $('#timeline').innerHTML=recent+all||'<p class="section-subtitle">回忆会在这里慢慢排好。</p>';
+}
+function showVisitOnly(city){
+ const visits=(state.settings.travelDates||[]).filter(v=>v.city===city);if(!visits.length)return;
+ stopSlideshow();activeTrip=null;
+ $('#detailContent').innerHTML='<div class="detail-body visit-only-body"><div class="detail-meta">OUR LITTLE JOURNEY</div><h2 class="detail-title" id="detailHeading">'+escape(city)+' · 我们来过</h2>'+renderVisitPanel({visits},true)+'<p class="detail-story">这段旅行的日期已经记下。照片，等我们慢慢收藏。</p></div>';
+ openDialog('tripDialog');$('#tripDialog').scrollTop=0;
+}
+
 function render(){
- const trips=sorted(),years=[...new Set(trips.map(tripYear).filter(Boolean))].sort().reverse();
- const hasUndated=trips.some(t=>!t.start);
+ const trips=sorted(),years=[...new Set(trips.flatMap(tripYears).filter(Boolean))].sort().reverse();
+ const hasUndated=trips.some(t=>!hasTripDate(t));
  if(filter!=='all'&&filter!=='undated'&&!years.includes(filter))filter='all';
  const cities=new Set(trips.map(t=>t.city||t.place.split(/[·,，]/)[0].trim()));
- const recordedYears=new Set(trips.flatMap(t=>[tripYear(t),...t.photos.map(p=>(p.takenAt||'').slice(0,4))]).filter(Boolean));
+ const recordedYears=new Set(trips.flatMap(t=>t.dateSource==='owner'?tripYears(t):[...tripYears(t),...t.photos.map(p=>(p.takenAt||'').slice(0,4))]).filter(Boolean));
  const count=trips.reduce((n,t)=>n+t.photos.length,0);
  $('#statTrips').textContent=String(cities.size).padStart(2,'0');
  $('#statDays').textContent=recordedYears.size?String(recordedYears.size).padStart(2,'0'):'—';
  $('#statPhotos').textContent=String(count).padStart(2,'0');
  renderJournal(true);
  renderPending();
- $('#timeline').innerHTML=trips.filter(t=>t.start).slice(0,4).map(t=>`<button class="timeline-row" data-trip="${escape(t.id)}"><span class="timeline-date">${escape(t.start.slice(5).replace('-','.'))}<small>${escape(t.start.slice(0,4))}</small></span><span class="timeline-dot"></span><img src="${photoThumb(t.photos[t.cover||0]||t.photos[0])}" alt="" loading="lazy"><span class="timeline-caption"><strong>${escape(t.city||t.place.split('·')[0])} · 我们的片段</strong><span>${escape(t.place)} / ${t.photos.length} 帧回忆</span></span>${icon('diag')}</button>`).join('')||'<p class="section-subtitle">给照片补上日期后，回忆会在这里慢慢排好。</p>';
+ renderTravelTimeline();
  renderChinaMap();
  $('#heroNames').textContent=state.settings.names||'你与我';$('#ourNames').textContent=state.settings.names||'你与我';$('#ourLetter').textContent=state.settings.letter||seed.settings.letter;
  document.body.classList.toggle('night',!!state.settings.night);$('#themeToggle').setAttribute('aria-pressed',String(!!state.settings.night));observeReveals();
@@ -85,13 +108,13 @@ function renderChinaMap(){
 }
 
 function renderJournal(animate=false){
- const trips=sorted(),years=[...new Set(trips.map(tripYear).filter(Boolean))].sort().reverse(),hasUndated=trips.some(t=>!t.start);
+ const trips=sorted(),years=[...new Set(trips.flatMap(tripYears).filter(Boolean))].sort().reverse(),hasUndated=trips.some(t=>!hasTripDate(t));
  $('#filters').innerHTML=['all',...years,...(hasUndated?['undated']:[])].map(y=>`<button class="filter${filter===y?' active':''}" data-year="${escape(y)}" aria-pressed="${filter===y}">${y==='all'?'全部回忆':y==='undated'?'日期待补充':escape(y)}</button>`).join('');
  const query=searchQuery.trim().toLocaleLowerCase();
- const shown=trips.filter(t=>(filter==='all'||(filter==='undated'?!t.start:tripYear(t)===filter))&&(!query||[t.city,t.place,t.title,t.story].join(' ').toLocaleLowerCase().includes(query)));
+ const shown=trips.filter(t=>(filter==='all'||(filter==='undated'?!hasTripDate(t):tripYears(t).includes(filter)))&&(!query||[t.city,t.place,t.title,t.story].join(' ').toLocaleLowerCase().includes(query)));
  if(sortOrder==='city')shown.sort((a,b)=>(a.city||a.place).localeCompare(b.city||b.place,'zh-CN'));
  if(sortOrder==='photos')shown.sort((a,b)=>b.photos.length-a.photos.length);
- $('#tripsGrid').innerHTML=shown.length?shown.map(t=>{const no=String(trips.length-trips.indexOf(t)).padStart(2,'0');return `<article class="trip-card reveal${animate?'':' visible'}" tabindex="0" role="button" data-trip="${escape(t.id)}" aria-label="查看旅行：${escape(t.title)}"><div class="trip-image-wrap"><img src="${photoSrc(t.photos[t.cover||0]||t.photos[0])}" alt="${escape(t.place)}的旅行封面" loading="lazy" decoding="async"><span class="trip-num">STORY / ${no}</span><span class="photo-count">${icon('photo')}${t.photos.length} 帧回忆</span><span class="trip-open">${icon('diag')}</span></div><div class="trip-meta"><span>${escape(t.place)}</span><time${t.start?' datetime="'+escape(t.start)+'"':''}>${dateLabel(t)}</time></div><h3 class="trip-title">${escape(t.title)}</h3><p class="trip-summary">${escape(t.summary||t.story||'这段时光，因为有你而值得收藏。')}</p><div class="trip-tags"><span>${t.album?'城市相册':t.demo?'示例旅行':dayCount(t)+' 天慢时光'}</span><span>${t.start?'光影已收藏':'日期可以慢慢补'}</span></div></article>`;}).join(''):`<div class="empty"><p>${searchQuery||filter!=='all'?'这一次，还没有翻到。':'这一页，等我们一起写。'}</p><button class="text-btn" ${searchQuery||filter!=='all'?'data-clear-search':'data-action="new"'}>${searchQuery||filter!=='all'?'查看全部回忆':'收藏第一段旅行'} ${icon('arrow')}</button></div>`;
+ $('#tripsGrid').innerHTML=shown.length?shown.map(t=>{const no=String(trips.length-trips.indexOf(t)).padStart(2,'0');return `<article class="trip-card reveal${animate?'':' visible'}" tabindex="0" role="button" data-trip="${escape(t.id)}" aria-label="查看旅行：${escape(t.title)}"><div class="trip-image-wrap"><img src="${photoSrc(t.photos[t.cover||0]||t.photos[0])}" alt="${escape(t.place)}的旅行封面" loading="lazy" decoding="async"><span class="trip-num">STORY / ${no}</span><span class="photo-count">${icon('photo')}${t.photos.length} 帧回忆</span><span class="trip-open">${icon('diag')}</span></div><div class="trip-meta"><span>${escape(t.place)}</span><time${t.start?' datetime="'+escape(t.start)+'"':''}>${dateLabel(t)}</time></div><h3 class="trip-title">${escape(t.title)}</h3><p class="trip-summary">${escape(t.summary||t.story||'这段时光，因为有你而值得收藏。')}</p><div class="trip-tags"><span>${t.datePeriod?'时光相册':tripVisits(t).length?tripVisits(t).length+' 次旅行':t.album?'城市相册':t.demo?'示例旅行':dayCount(t)+' 天慢时光'}</span><span>${t.datePeriod?t.datePeriod.startYear+'—'+t.datePeriod.endYear:tripVisits(t).length?'共 '+tripTravelDays(t)+' 天慢时光':t.start?'光影已收藏':'日期可以慢慢补'}</span></div></article>`;}).join(''):`<div class="empty"><p>${searchQuery||filter!=='all'?'这一次，还没有翻到。':'这一页，等我们一起写。'}</p><button class="text-btn" ${searchQuery||filter!=='all'?'data-clear-search':'data-action="new"'}>${searchQuery||filter!=='all'?'查看全部回忆':'收藏第一段旅行'} ${icon('arrow')}</button></div>`;
  $('#journalCount').textContent=`共 ${shown.length} 本相册 · ${shown.reduce((n,t)=>n+t.photos.length,0)} 帧回忆`;
  $('#searchResult').hidden=!query;
  $('#searchResult').innerHTML=query?`找到 ${shown.length} 本关于「${escape(searchQuery.trim())}」的相册 <button data-clear-search>清除查找</button>`:'';
@@ -101,7 +124,7 @@ function renderPending(){
  const cities=new Set(state.trips.map(t=>t.city||t.place.split('·')[0].trim()));
  const pending=(state.settings.pendingPlaces||seed.settings.pendingPlaces||[]).filter(p=>typeof p.city==='string'&&!cities.has(p.city));
  $('#pendingSection').hidden=!pending.length;
- $('#pendingPlaces').innerHTML=pending.map(p=>`<span class="pending-place"><span>${escape(p.city)}</span><small>待补照片</small></span>`).join('');
+ $('#pendingPlaces').innerHTML=pending.map(p=>`<span class="pending-place"><span>${escape(p.city)}</span><small>${p.visits?.length?escape(p.visits.map(visitDateLabel).join(" / "))+" · ":""}待补照片</small></span>`).join('');
 }
 
 const revealObserver=!reduced?new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible');revealObserver.unobserve(entry.target);}});},{threshold:.07}):null;
@@ -110,7 +133,7 @@ function showTrip(id){
  const t=state.trips.find(t=>t.id===id);if(!t)return;stopSlideshow();stripTripId=null;activeTrip=t;
  const trips=sorted(),index=trips.findIndex(x=>x.id===id);
  const known=t.photos.filter(p=>p.takenAt).length;
- $('#detailContent').innerHTML=`<img class="detail-cover" src="${photoSrc(t.photos[t.cover||0]||t.photos[0])}" alt="${escape(t.place)}的旅行封面"><div class="detail-body"><div class="detail-meta">STORY ${String(trips.length-index).padStart(2,'0')} · ${t.album?'我们的城市相册':t.demo?'示例旅行':'OUR LITTLE JOURNEY'}</div><h2 class="detail-title" id="detailHeading">${escape(t.title)}</h2><div class="detail-info"><span>${icon('pin')}${escape(t.place)}</span><span>${icon('calendar')}${t.album&&t.start?'已知照片日期：':''}${dateLabel(t)}</span><span>${icon('photo')}${t.photos.length} 帧回忆</span></div><p class="detail-story">${escape(t.story||'我们把最好的心情，留在了这段旅途中。')}</p>${t.days&&t.days.length?`<div class="detail-days">${t.days.map((d,i)=>`<div class="day-note"><strong>Day ${String(i+1).padStart(2,'0')}</strong><h3>${escape(d.title)}</h3><p>${escape(d.text)}</p></div>`).join('')}</div>`:''}<div class="detail-gallery-head"><h3>把这些瞬间，留久一点。</h3><div class="gallery-controls"><span>${t.photos.length} 帧回忆 · 点击放大</span><div class="gallery-layout" role="group" aria-label="照片排版"><button data-gallery="full" aria-pressed="${galleryMode==='full'}">完整画幅</button><button data-gallery="grid" aria-pressed="${galleryMode==='grid'}">胶片方格</button></div></div></div><div class="detail-gallery${galleryMode==='full'?' full-frames':''}" id="detailGallery">${t.photos.map((p,i)=>`<button class="detail-photo${p.originalHeight>p.originalWidth*3.2?' long-frame':''}" data-photo="${i}" aria-label="放大第${i+1}张照片：${escape(p.caption||'旅途瞬间')}"><img style="--photo-ratio:${Number(p.originalWidth)||1}/${Number(p.originalHeight)||1}" src="${p.originalHeight>p.originalWidth*3.2?photoSrc(p):photoThumb(p)}" alt="${escape(p.caption||t.place+'的旅途瞬间')}" loading="lazy"><span><em>${String(i+1).padStart(2,'0')}</em>${p.originalHeight>p.originalWidth*3.2?'长图 · 放大细看 / ':''}${escape(p.caption||'这一刻，值得收藏。')}${p.takenAt?' · '+dateString(p.takenAt):''}</span></button>`).join('')}</div><div class="detail-bottom"><small>把这些瞬间，慢慢收藏。</small></div><div class="detail-pagination"><button data-trip="${escape(trips[(index-1+trips.length)%trips.length].id)}">${icon('left')}上一篇故事</button><button data-trip="${escape(trips[(index+1)%trips.length].id)}">下一篇故事${icon('right')}</button></div></div>`;
+ $('#detailContent').innerHTML=`<img class="detail-cover" src="${photoSrc(t.photos[t.cover||0]||t.photos[0])}" alt="${escape(t.place)}的旅行封面"><div class="detail-body"><div class="detail-meta">STORY ${String(trips.length-index).padStart(2,'0')} · ${t.album?'我们的城市相册':t.demo?'示例旅行':'OUR LITTLE JOURNEY'}</div><h2 class="detail-title" id="detailHeading">${escape(t.title)}</h2><div class="detail-info"><span>${icon('pin')}${escape(t.place)}</span><span>${icon('calendar')}${t.datePeriod?'回忆时段：':t.dateSource==='owner'?'旅行日期：':t.album&&t.start?'已知照片日期：':''}${dateLabel(t)}</span><span>${icon('photo')}${t.photos.length} 帧回忆</span></div>${renderVisitPanel(t)}<p class="detail-story">${escape(t.story||'我们把最好的心情，留在了这段旅途中。')}</p>${t.days&&t.days.length?`<div class="detail-days">${t.days.map((d,i)=>`<div class="day-note"><strong>Day ${String(i+1).padStart(2,'0')}</strong><h3>${escape(d.title)}</h3><p>${escape(d.text)}</p></div>`).join('')}</div>`:''}<div class="detail-gallery-head"><h3>把这些瞬间，留久一点。</h3><div class="gallery-controls"><span>${t.photos.length} 帧回忆 · 点击放大</span><div class="gallery-layout" role="group" aria-label="照片排版"><button data-gallery="full" aria-pressed="${galleryMode==='full'}">完整画幅</button><button data-gallery="grid" aria-pressed="${galleryMode==='grid'}">胶片方格</button></div></div></div><div class="detail-gallery${galleryMode==='full'?' full-frames':''}" id="detailGallery">${t.photos.map((p,i)=>`<button class="detail-photo${p.originalHeight>p.originalWidth*3.2?' long-frame':''}" data-photo="${i}" aria-label="放大第${i+1}张照片：${escape(p.caption||'旅途瞬间')}"><img style="--photo-ratio:${Number(p.originalWidth)||1}/${Number(p.originalHeight)||1}" src="${p.originalHeight>p.originalWidth*3.2?photoSrc(p):photoThumb(p)}" alt="${escape(p.caption||t.place+'的旅途瞬间')}" loading="lazy"><span><em>${String(i+1).padStart(2,'0')}</em>${p.originalHeight>p.originalWidth*3.2?'长图 · 放大细看 / ':''}${escape(p.caption||'这一刻，值得收藏。')}${p.takenAt?' · '+dateString(p.takenAt):''}</span></button>`).join('')}</div><div class="detail-bottom"><small>把这些瞬间，慢慢收藏。</small></div><div class="detail-pagination"><button data-trip="${escape(trips[(index-1+trips.length)%trips.length].id)}">${icon('left')}上一篇故事</button><button data-trip="${escape(trips[(index+1)%trips.length].id)}">下一篇故事${icon('right')}</button></div></div>`;
  openDialog('tripDialog');$('#tripDialog').scrollTop=0;
 }
 function showPhoto(index){
@@ -138,6 +161,7 @@ document.addEventListener('click',event=>{
  if(target.closest('[data-clear-search]')){searchQuery='';filter='all';$('#journalSearch').value='';renderJournal();return;}
  const gallery=target.closest('[data-gallery]');if(gallery){galleryMode=gallery.dataset.gallery;$('#detailGallery').classList.toggle('full-frames',galleryMode==='full');$('[data-gallery]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.gallery===galleryMode)));return;}
  const frame=target.closest('[data-lightbox-photo]');if(frame){stopSlideshow();showPhoto(Number(frame.dataset.lightboxPhoto));return;}
+ const visitOnly=target.closest('[data-visit-city]');if(visitOnly){showVisitOnly(visitOnly.dataset.visitCity);return;}
  const trip=target.closest('[data-trip]');if(trip){showTrip(trip.dataset.trip);return;}
  const photo=target.closest('[data-photo]');if(photo)showPhoto(Number(photo.dataset.photo));
 });
