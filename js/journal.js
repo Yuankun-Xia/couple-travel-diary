@@ -1,6 +1,5 @@
 
 export async function startJournal({assets,seed,chinaMapData}) {
-'use strict';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 for(const name of Object.keys(assets)){if(assets[name]&&typeof assets[name]==='object'&&assets[name].ref)assets[name]=assets[assets[name].ref];}
 let state={trips:structuredClone(seed.trips),settings:{...seed.settings},photoRevision:seed.photoRevision||'initial'},filter='all',db=null,activeTrip=null,lightboxIndex=0,editorPhotos=[],editId=null,busy=false,audioCtx=null,audioNodes=[],searchQuery='',sortOrder='latest',galleryMode='full',slideshowTimer=null,stripTripId=null;
