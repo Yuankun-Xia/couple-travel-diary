@@ -22,7 +22,7 @@ export function installPhotoLoader({descriptors,key,baseUrl=new URL('../data/',i
  const notice=document.createElement('div');notice.className='photo-load-notice';notice.hidden=true;notice.setAttribute('role','status');notice.innerHTML='<span>有照片暂时没加载出来</span><button type="button">重试照片</button>';document.body.append(notice);
  const protectedFiles=()=>new Set([...visible].filter(s=>s.img.isConnected).flatMap(s=>[s.file,s.preview].filter(Boolean)));
  const store=createAssetStore({concurrency:slow?2:mobile?3:4,budget:(mobile?24:64)*1024*1024,estimateSize:(data,file)=>Math.max(data.byteLength,weights.get(file)||0),protectedFiles,load:async file=>new Uint8Array(await decryptEnvelope(await fetchCipher(new URL(file,baseUrl)),key,'photo:'+file)),createUrl:(data,file)=>URL.createObjectURL(new Blob([data],{type:byFile.get(file).mime})),revokeUrl:url=>URL.revokeObjectURL(url),onEvict(file,url){for(const s of states)if(s.expected===url){s.status='idle';paint(s,s.src);}}});
- function updateNotice(){for(const s of failed)if(!s.img.isConnected)failed.delete(s);notice.hidden=!failed.size;}
+ function updateNotice(){for(const s of failed)if(!s.img.isConnected)failed.delete(s);notice.hidden=!failed.size;const dialogs=[...document.querySelectorAll('dialog[open]')],host=dialogs.at(-1)||document.body;if(notice.parentNode!==host)host.append(notice);}
  function paint(s,url){if(bindings.get(s.img)!==s||!s.img.isConnected)return;s.expected=url;s.img.src=url;}
  async function display(s){if(stopped||s.status==='loading'||s.status==='error'||!s.img.isConnected)return;s.status='loading';const needed=()=>!stopped&&s.img.isConnected&&bindings.get(s.img)===s&&visible.has(s);
   try{if(s.preview&&s.preview!==s.file){try{const preview=await store.ensure(s.preview,40,needed);if(!needed()){s.status='idle';return;}paint(s,preview);s.hasPreview=true;}catch(error){if(error.message==='cancelled'){s.status='idle';return;}}}
@@ -35,6 +35,6 @@ export function installPhotoLoader({descriptors,key,baseUrl=new URL('../data/',i
  function retry(){for(const s of failed){s.status='idle';s.img.classList.remove('asset-error');if(visible.has(s))display(s);}failed.clear();updateNotice();}
  notice.querySelector('button').addEventListener('click',retry);window.addEventListener('online',retry);
  const mutations=new MutationObserver(list=>{for(const m of list){if(m.type==='attributes')watch(m.target);else for(const node of m.addedNodes)if(node.nodeType===1){if(node.matches('img'))watch(node);node.querySelectorAll('img').forEach(watch);}}for(const s of states)if(!s.img.isConnected){states.delete(s);visible.delete(s);failed.delete(s);observer.unobserve(s.img);}updateNotice();store.prune();});
- mutations.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['src']});document.querySelectorAll('img').forEach(watch);
+ mutations.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['src','open']});document.querySelectorAll('img').forEach(watch);
  const dispose=()=>{stopped=true;mutations.disconnect();observer.disconnect();store.dispose();window.removeEventListener('online',retry);notice.remove();};window.addEventListener('pagehide',event=>{if(!event.persisted)dispose();},{once:true});return {dispose,stats:store.stats};
 }

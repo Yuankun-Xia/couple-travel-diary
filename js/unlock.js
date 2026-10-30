@@ -1,6 +1,6 @@
 import {startJournal} from './journal.js?v=20261030-1';
-import {readManifest} from './manifest.js?v=20261030-1';
-import {installPhotoLoader} from './photo-loader.js';
+import {readManifest} from './manifest.js?v=20261030-2';
+import {installPhotoLoader} from './photo-loader.js?v=20261030-2';
 const status=document.querySelector('#gateStatus'),retry=document.querySelector('#gateRetry');
 const storageName='mmz-key:'+location.pathname,params=new URLSearchParams(location.hash.slice(1));let encoded=params.get('k');
 if(encoded!==null)history.replaceState(null,'',location.pathname+location.search);
