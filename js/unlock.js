@@ -1,4 +1,5 @@
-import {startJournal} from './journal.js?v=20261030-1';
+import {startJournal} from './journal.js?v=20261030-music1';
+import {mountMusic} from './music.js?v=20261030-1';
 import {readManifest} from './manifest.js?v=20261030-2';
 import {installPhotoLoader} from './photo-loader.js?v=20261030-2';
 const status=document.querySelector('#gateStatus'),retry=document.querySelector('#gateRetry');
@@ -14,8 +15,9 @@ async function unlock(){
  catch(error){if(error.name==='OperationError'||error.message==='invalid-key')try{sessionStorage.removeItem(storageName);}catch{}encoded=null;status.textContent='暂时无法翻开手帖。请检查网络，或重新打开完整专属链接。';retry.hidden=false;return;}
  encoded=null;const template=document.createElement('template');template.innerHTML=payload.layout;if(template.content.querySelector('script,iframe,object,embed,form,base'))throw Error('unsafe-template');
  const assets={};for(const [name,d]of Object.entries(payload.assets)){if(!/^[a-f0-9]{32}\.bin$/.test(d.file)||!/^image\/(jpeg|png|webp|gif)$/.test(d.mime))throw Error('unsafe-image');assets[name]='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12"><rect width="16" height="12" fill="#dfddcf"/></svg>')+'#mmz='+d.file;}
- document.body.replaceChildren(template.content);const loader=installPhotoLoader({descriptors:payload.assets,key});
- document.querySelector('#lockDiary').addEventListener('click',()=>{try{sessionStorage.removeItem(storageName);}catch{}loader.dispose();location.replace(location.pathname);});
+ document.body.replaceChildren(template.content);const loader=installPhotoLoader({descriptors:payload.assets,key});let music;
+ document.querySelector('#lockDiary').addEventListener('click',()=>{try{sessionStorage.removeItem(storageName);}catch{}music?.dispose();loader.dispose();location.replace(location.pathname);});
  await startJournal({assets,seed:payload.seed,chinaMapData:payload.chinaMapData});
+ music=mountMusic({tracks:payload.music||[],key});
 }
 unlock().catch(()=>{const panel=document.createElement('div');panel.className='photo-load-notice';panel.innerHTML='<span>手帖暂未完整打开</span><button type="button">重新打开</button>';panel.querySelector('button').addEventListener('click',()=>location.reload());document.body.append(panel);});
